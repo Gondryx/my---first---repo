@@ -75,9 +75,17 @@ DEEPSEEK_API_KEY = "your_api_key_here"
 python main.py
 ```
 
-## �� 项目结构
+## 📁 项目结构
 
 详细的项目结构请查看 [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)
+
+## 📖 使用文档
+
+- **🚀 快速入门**: [QUICK_START.md](docs/QUICK_START.md) - 5分钟快速上手
+- **📖 用户手册**: [USER_MANUAL.md](docs/USER_MANUAL.md) - 详细操作指南
+- **🛠️ 开发指南**: [DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) - 开发者文档
+- **📊 项目状态**: [PROJECT_STATUS.md](docs/PROJECT_STATUS.md) - 开发进度
+- **🎯 Issues指南**: [CREATE_ISSUES_GUIDE.md](docs/CREATE_ISSUES_GUIDE.md) - 问题管理
 
 ## 🛠️ 技术栈
 
