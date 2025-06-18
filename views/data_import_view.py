@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon
 import pandas as pd
 import os
+from datetime import datetime
 
 class DataImportView(QWidget):
     """数据导入界面"""
@@ -198,41 +199,58 @@ class DataImportView(QWidget):
             self.progress_bar.setVisible(True)
             self.progress_bar.setValue(0)
             
-            file_type = self.file_type_combo.currentText()
+            # 获取导入参数
+            encoding = self.encoding_combo.currentText()
+            separator = self.separator_combo.currentText()
+            has_header = self.header_checkbox.isChecked()
             max_rows = self.max_rows_spin.value()
             
-            if "CSV" in file_type:
-                encoding = self.encoding_combo.currentText()
-                separator = self.separator_combo.currentText()
-                header = 0 if self.header_checkbox.isChecked() else None
-                
-                self.data = pd.read_csv(
-                    file_path, 
-                    encoding=encoding, 
-                    sep=separator, 
-                    header=header,
-                    nrows=max_rows
+            self.progress_bar.setValue(20)
+            
+            # 调用数据导入功能
+            if hasattr(self, 'controller') and self.controller:
+                # 如果有控制器，使用控制器的导入功能
+                import_result = self.controller.import_data_file(
+                    file_path, encoding, separator, has_header, max_rows
                 )
-            elif "Excel" in file_type:
-                self.data = pd.read_excel(file_path, nrows=max_rows)
             else:
-                self.data = pd.read_json(file_path)
-                if isinstance(self.data, dict):
-                    self.data = pd.json_normalize(self.data)
+                # 直接使用数据模型导入
+                from models.social_media_data import SocialMediaData
+                data_model = SocialMediaData()
+                import_result = data_model.import_csv_data(
+                    file_path, encoding, separator, has_header
+                )
+            
+            self.progress_bar.setValue(80)
+            
+            if import_result['valid']:
+                self.progress_bar.setValue(100)
+                QMessageBox.information(self, "导入成功", import_result['message'])
+                
+                # 保存数据到本地
+                if hasattr(self, 'controller') and self.controller:
+                    save_result = self.controller.save_imported_data(
+                        import_result['data'], 
+                        f"imported_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                    )
+                    if save_result['success']:
+                        QMessageBox.information(self, "保存成功", save_result['message'])
+                else:
+                    # 直接保存到data目录
+                    import os
+                    data_dir = "data"
+                    os.makedirs(data_dir, exist_ok=True)
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    filename = f"imported_data_{timestamp}.csv"
+                    file_path = os.path.join(data_dir, filename)
+                    import_result['data'].to_csv(file_path, index=False, encoding='utf-8')
+                    QMessageBox.information(self, "保存成功", f"数据已保存到: {filename}")
                     
-            self.progress_bar.setValue(100)
-            
-            QMessageBox.information(
-                self, "成功", 
-                f"数据导入成功！\n共导入 {len(self.data)} 行数据，{len(self.data.columns)} 列。"
-            )
-            
-            # 发送数据到主控制器
-            if hasattr(self.parent(), 'set_imported_data'):
-                self.parent().set_imported_data(self.data)
+            else:
+                QMessageBox.critical(self, "导入失败", import_result['error'])
                 
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"数据导入失败: {str(e)}")
+            QMessageBox.critical(self, "导入失败", f"导入过程中发生错误: {str(e)}")
         finally:
             self.progress_bar.setVisible(False)
             

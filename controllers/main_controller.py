@@ -183,8 +183,46 @@ class MainController:
             df = self.social_media_data.generate_sample_data(platform)
         else:
             # 从文件导入数据
-            # TODO: 实现从文件导入数据的功能
-            df = self.social_media_data.generate_sample_data(platform)  # 暂时使用示例数据
+            if not file_path:
+                QMessageBox.warning(self.main_view, "导入失败", "请选择数据文件")
+                return
+                
+            # 导入CSV数据
+            import_result = self.social_media_data.import_csv_data(
+                file_path=file_path,
+                encoding='utf-8',
+                separator=',',
+                has_header=True
+            )
+            
+            if not import_result['valid']:
+                QMessageBox.critical(self.main_view, "导入失败", import_result['error'])
+                return
+                
+            df = import_result['data']
+            
+            # 保存导入的数据
+            save_result = self.social_media_data.save_imported_data(
+                df, 
+                self.current_user[0], 
+                f"{platform}_imported_data"
+            )
+            
+            # 添加数据导入记录到数据库
+            self.db.add_data_import(
+                user_id=self.current_user[0],
+                import_name=f"{platform}_imported_data",
+                file_path=file_path,
+                data_count=len(df),
+                platform=platform
+            )
+            
+            if save_result['success']:
+                QMessageBox.information(self.main_view, "导入成功", 
+                    f"{import_result['message']}\n{save_result['message']}")
+            else:
+                QMessageBox.warning(self.main_view, "保存警告", 
+                    f"{import_result['message']}\n但保存失败: {save_result['error']}")
             
         self.main_view.analysis_progress.setValue(40)
         
@@ -736,4 +774,60 @@ class MainController:
         """导出营销方案（待开发）"""
         if hasattr(self, 'main_view'):
             from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.information(self.main_view, "提示", "导出营销方案功能待开发！")    
+            QMessageBox.information(self.main_view, "提示", "导出营销方案功能待开发！")
+    
+    def share_marketing_plan(self):
+        """分享营销方案（待实现）"""
+        pass    
+
+    def import_data_file(self, file_path, encoding='utf-8', separator=',', has_header=True, max_rows=None):
+        """导入数据文件"""
+        try:
+            # 调用数据模型的导入功能
+            import_result = self.social_media_data.import_csv_data(
+                file_path=file_path,
+                encoding=encoding,
+                separator=separator,
+                has_header=has_header
+            )
+            
+            if import_result['valid'] and max_rows:
+                # 限制行数
+                import_result['data'] = import_result['data'].head(max_rows)
+                import_result['message'] = f"成功导入 {len(import_result['data'])} 条数据（限制{max_rows}行）"
+                
+            return import_result
+            
+        except Exception as e:
+            return {
+                'valid': False,
+                'error': f"导入失败: {str(e)}"
+            }
+    
+    def save_imported_data(self, df, data_name):
+        """保存导入的数据"""
+        try:
+            # 调用数据模型的保存功能
+            save_result = self.social_media_data.save_imported_data(
+                df, 
+                self.current_user[0], 
+                data_name
+            )
+            
+            if save_result['success']:
+                # 添加数据导入记录到数据库
+                self.db.add_data_import(
+                    user_id=self.current_user[0],
+                    import_name=data_name,
+                    file_path=save_result['file_path'],
+                    data_count=len(df),
+                    platform=df['platform'].iloc[0] if 'platform' in df.columns else '未知平台'
+                )
+                
+            return save_result
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"保存失败: {str(e)}"
+            }    

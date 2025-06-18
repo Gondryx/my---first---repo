@@ -62,6 +62,20 @@ class DatabaseManager:
         )
         ''')
         
+        # 数据导入表
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS data_imports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            import_name TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            data_count INTEGER NOT NULL,
+            platform TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        ''')
+        
         conn.commit()
         conn.close()
         
@@ -164,4 +178,31 @@ class DatabaseManager:
                   (plan_id,))
         plan = c.fetchone()
         conn.close()
-        return plan    
+        return plan
+        
+    def add_data_import(self, user_id, import_name, file_path, data_count, platform):
+        """添加数据导入记录"""
+        conn = sqlite3.connect(self.db_name)
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO data_imports (user_id, import_name, file_path, data_count, platform, created_at) 
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """, (user_id, import_name, file_path, data_count, platform))
+        conn.commit()
+        import_id = c.lastrowid
+        conn.close()
+        return import_id
+        
+    def get_data_imports(self, user_id):
+        """获取用户的数据导入记录"""
+        conn = sqlite3.connect(self.db_name)
+        c = conn.cursor()
+        c.execute("""
+            SELECT id, import_name, file_path, data_count, platform, created_at 
+            FROM data_imports 
+            WHERE user_id = ? 
+            ORDER BY created_at DESC
+        """, (user_id,))
+        imports = c.fetchall()
+        conn.close()
+        return imports    

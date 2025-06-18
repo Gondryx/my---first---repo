@@ -2,12 +2,174 @@ import pandas as pd
 import numpy as np
 import random
 from datetime import datetime, timedelta
+import os
 
 class SocialMediaData:
     def __init__(self):
         # 支持的社交媒体平台
         self.platforms = ["综合平台", "微博", "微信", "抖音", "小红书", "B站"]
         
+        # 标准字段映射
+        self.field_mapping = {
+            'date': ['日期', '发布时间', 'date', 'time', '发布时间'],
+            'platform': ['平台', 'platform', '社交媒体平台'],
+            'content_type': ['内容类型', 'content_type', '类型'],
+            'engagement': ['互动量', 'engagement', '互动数据', '点赞数', '评论数', '转发数'],
+            'reach': ['触达量', 'reach', '曝光量', '阅读量', '播放量'],
+            'conversion': ['转化量', 'conversion', '转化数据'],
+            'content': ['内容', 'content', '文本内容', '内容文本'],
+            'user_type': ['用户类型', 'user_type', '用户'],
+            'sentiment': ['情感倾向', 'sentiment', '情感', '情绪']
+        }
+        
+    def import_csv_data(self, file_path, encoding='utf-8', separator=',', has_header=True):
+        """导入CSV数据文件"""
+        try:
+            # 读取CSV文件
+            if has_header:
+                df = pd.read_csv(file_path, encoding=encoding, sep=separator)
+            else:
+                df = pd.read_csv(file_path, encoding=encoding, sep=separator, header=None)
+                
+            # 验证数据格式
+            validation_result = self.validate_data_format(df)
+            
+            if not validation_result['valid']:
+                return validation_result
+                
+            # 标准化字段名
+            df = self.standardize_columns(df)
+            
+            # 数据清洗
+            df = self.clean_data(df)
+            
+            return {
+                'valid': True,
+                'data': df,
+                'message': f"成功导入 {len(df)} 条数据",
+                'columns': list(df.columns),
+                'sample': df.head(5).to_dict('records')
+            }
+            
+        except Exception as e:
+            return {
+                'valid': False,
+                'error': f"导入失败: {str(e)}",
+                'message': "请检查文件格式和编码"
+            }
+    
+    def validate_data_format(self, df):
+        """验证数据格式"""
+        if df.empty:
+            return {'valid': False, 'error': '数据文件为空'}
+            
+        if len(df.columns) < 3:
+            return {'valid': False, 'error': '数据列数不足，至少需要3列'}
+            
+        # 检查是否有必要的字段
+        required_fields = ['date', 'platform', 'content']
+        found_fields = []
+        
+        for field in required_fields:
+            for col in df.columns:
+                if any(keyword in col.lower() for keyword in self.field_mapping.get(field, [field])):
+                    found_fields.append(field)
+                    break
+                    
+        if len(found_fields) < 2:
+            return {
+                'valid': False, 
+                'error': f'缺少必要字段，需要包含日期、平台或内容字段。当前字段: {list(df.columns)}'
+            }
+            
+        return {'valid': True, 'found_fields': found_fields}
+    
+    def standardize_columns(self, df):
+        """标准化列名"""
+        column_mapping = {}
+        
+        for col in df.columns:
+            col_lower = col.lower()
+            for standard_field, keywords in self.field_mapping.items():
+                if any(keyword in col_lower for keyword in keywords):
+                    column_mapping[col] = standard_field
+                    break
+                    
+        # 重命名列
+        df = df.rename(columns=column_mapping)
+        
+        # 添加缺失的标准列
+        for field in self.field_mapping.keys():
+            if field not in df.columns:
+                if field == 'date':
+                    df[field] = pd.Timestamp.now()
+                elif field == 'platform':
+                    df[field] = '未知平台'
+                elif field == 'content_type':
+                    df[field] = '文本'
+                elif field == 'engagement':
+                    df[field] = 0
+                elif field == 'reach':
+                    df[field] = 0
+                elif field == 'conversion':
+                    df[field] = 0
+                elif field == 'content':
+                    df[field] = ''
+                elif field == 'user_type':
+                    df[field] = '个人用户'
+                elif field == 'sentiment':
+                    df[field] = '中性'
+                    
+        return df
+    
+    def clean_data(self, df):
+        """数据清洗"""
+        # 处理日期字段
+        if 'date' in df.columns:
+            df['date'] = pd.to_datetime(df['date'], errors='coerce')
+            df = df.dropna(subset=['date'])
+            
+        # 处理数值字段
+        numeric_fields = ['engagement', 'reach', 'conversion']
+        for field in numeric_fields:
+            if field in df.columns:
+                df[field] = pd.to_numeric(df[field], errors='coerce').fillna(0)
+                
+        # 处理文本字段
+        text_fields = ['content', 'platform', 'content_type', 'user_type', 'sentiment']
+        for field in text_fields:
+            if field in df.columns:
+                df[field] = df[field].astype(str).fillna('')
+                
+        return df
+    
+    def save_imported_data(self, df, user_id, data_name):
+        """保存导入的数据"""
+        try:
+            # 创建数据目录
+            data_dir = f"data/user_{user_id}"
+            os.makedirs(data_dir, exist_ok=True)
+            
+            # 生成文件名
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{data_name}_{timestamp}.csv"
+            file_path = os.path.join(data_dir, filename)
+            
+            # 保存数据
+            df.to_csv(file_path, index=False, encoding='utf-8')
+            
+            return {
+                'success': True,
+                'file_path': file_path,
+                'message': f"数据已保存到: {filename}"
+            }
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f"保存失败: {str(e)}"
+            }
+
     def generate_sample_data(self, platform, days=30):
         """生成示例社交媒体数据"""
         end_date = datetime.now()
