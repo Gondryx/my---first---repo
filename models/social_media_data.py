@@ -19,7 +19,8 @@ class SocialMediaData:
             'conversion': ['转化量', 'conversion', '转化数据'],
             'content': ['内容', 'content', '文本内容', '内容文本'],
             'user_type': ['用户类型', 'user_type', '用户'],
-            'sentiment': ['情感倾向', 'sentiment', '情感', '情绪']
+            'sentiment': ['情感倾向', 'sentiment', '情感', '情绪'],
+            'followers': ['粉丝数', 'followers', '关注者', '粉丝']
         }
         
     def import_csv_data(self, file_path, encoding='utf-8', separator=',', has_header=True):
@@ -30,19 +31,18 @@ class SocialMediaData:
                 df = pd.read_csv(file_path, encoding=encoding, sep=separator)
             else:
                 df = pd.read_csv(file_path, encoding=encoding, sep=separator, header=None)
-                
+            print(f"[DEBUG] 初始df.columns: {list(df.columns)}")
             # 验证数据格式
             validation_result = self.validate_data_format(df)
-            
+            print(f"[DEBUG] 验证结果: {validation_result}")
             if not validation_result['valid']:
                 return validation_result
-                
             # 标准化字段名
             df = self.standardize_columns(df)
-            
+            print(f"[DEBUG] 标准化后df.columns: {list(df.columns)}")
             # 数据清洗
             df = self.clean_data(df)
-            
+            print(f"[DEBUG] 清洗后df.columns: {list(df.columns)}")
             return {
                 'valid': True,
                 'data': df,
@@ -50,8 +50,10 @@ class SocialMediaData:
                 'columns': list(df.columns),
                 'sample': df.head(5).to_dict('records')
             }
-            
         except Exception as e:
+            import traceback
+            print(f"[ERROR] import_csv_data异常: {str(e)}")
+            traceback.print_exc()
             return {
                 'valid': False,
                 'error': f"导入失败: {str(e)}",
@@ -85,22 +87,44 @@ class SocialMediaData:
         return {'valid': True, 'found_fields': found_fields}
     
     def standardize_columns(self, df):
-        """标准化列名"""
+        """标准化列名并合并同名数值列"""
         column_mapping = {}
-        
-        for col in df.columns:
-            col_lower = col.lower()
+        columns = list(df.columns)
+        print(f"[DEBUG] standardize_columns输入: {columns}")
+        # 记录每个标准字段对应的原始列
+        reverse_map = {k: [] for k in self.field_mapping.keys()}
+        for col in columns:
+            col_lower = str(col).lower()
             for standard_field, keywords in self.field_mapping.items():
                 if any(keyword in col_lower for keyword in keywords):
                     column_mapping[col] = standard_field
+                    reverse_map[standard_field].append(col)
                     break
-                    
-        # 重命名列
-        df = df.rename(columns=column_mapping)
-        
+        print(f"[DEBUG] column_mapping: {column_mapping}")
+        # 合并数值型字段
+        numeric_fields = ['engagement', 'reach', 'conversion', 'followers']
+        for field in numeric_fields:
+            cols = reverse_map[field]
+            if len(cols) > 1:
+                # 多列合并求和
+                df[field] = df[cols].apply(pd.to_numeric, errors='coerce').sum(axis=1)
+                df = df.drop(columns=[c for c in cols if c != field])
+            elif len(cols) == 1:
+                df = df.rename(columns={cols[0]: field})
+        # 其他字段只保留第一个
+        for field in self.field_mapping.keys():
+            if field not in numeric_fields:
+                cols = reverse_map[field]
+                if len(cols) > 1:
+                    df = df.rename(columns={cols[0]: field})
+                    df = df.drop(columns=[c for c in cols[1:]])
+                elif len(cols) == 1:
+                    df = df.rename(columns={cols[0]: field})
+        print(f"[DEBUG] 合并后df.columns: {list(df.columns)}")
         # 添加缺失的标准列
         for field in self.field_mapping.keys():
             if field not in df.columns:
+                print(f"[DEBUG] 添加缺失字段: {field}")
                 if field == 'date':
                     df[field] = pd.Timestamp.now()
                 elif field == 'platform':
@@ -113,13 +137,15 @@ class SocialMediaData:
                     df[field] = 0
                 elif field == 'conversion':
                     df[field] = 0
+                elif field == 'followers':
+                    df[field] = 0
                 elif field == 'content':
                     df[field] = ''
                 elif field == 'user_type':
                     df[field] = '个人用户'
                 elif field == 'sentiment':
                     df[field] = '中性'
-                    
+        print(f"[DEBUG] 返回前df.columns: {list(df.columns)}")
         return df
     
     def clean_data(self, df):
@@ -130,7 +156,7 @@ class SocialMediaData:
             df = df.dropna(subset=['date'])
             
         # 处理数值字段
-        numeric_fields = ['engagement', 'reach', 'conversion']
+        numeric_fields = ['engagement', 'reach', 'conversion', 'followers']
         for field in numeric_fields:
             if field in df.columns:
                 df[field] = pd.to_numeric(df[field], errors='coerce').fillna(0)
@@ -220,23 +246,31 @@ class SocialMediaData:
         # 基本统计
         analysis['基本统计'] = {
             '总天数': len(df),
-            '平均粉丝数': df['粉丝数'].mean(),
-            '平均互动量': df['互动量'].mean(),
-            '平均曝光量': df['曝光量'].mean(),
-            '平均点击率': df['点击率'].mean(),
-            '平均转化率': df['转化率'].mean()
+            '平均粉丝数': df['followers'].mean() if 'followers' in df.columns else 0,
+            '平均互动量': df['engagement'].mean() if 'engagement' in df.columns else 0,
+            '平均曝光量': df['reach'].mean() if 'reach' in df.columns else 0,
+            '平均点击率': df['conversion'].mean() if 'conversion' in df.columns else 0,
+            '平均转化率': df['conversion'].mean() if 'conversion' in df.columns else 0
         }
         
         # 增长分析
-        latest_followers = df['粉丝数'].iloc[-1]
-        initial_followers = df['粉丝数'].iloc[0]
-        followers_growth = latest_followers - initial_followers
-        followers_growth_rate = (followers_growth / initial_followers) * 100 if initial_followers > 0 else 0
+        if 'followers' in df.columns:
+            latest_followers = df['followers'].iloc[-1]
+            initial_followers = df['followers'].iloc[0]
+            followers_growth = latest_followers - initial_followers
+            followers_growth_rate = (followers_growth / initial_followers) * 100 if initial_followers > 0 else 0
+        else:
+            followers_growth = 0
+            followers_growth_rate = 0
         
-        latest_engagement = df['互动量'].iloc[-1]
-        initial_engagement = df['互动量'].iloc[0]
-        engagement_growth = latest_engagement - initial_engagement
-        engagement_growth_rate = (engagement_growth / initial_engagement) * 100 if initial_engagement > 0 else 0
+        if 'engagement' in df.columns:
+            latest_engagement = df['engagement'].iloc[-1]
+            initial_engagement = df['engagement'].iloc[0]
+            engagement_growth = latest_engagement - initial_engagement
+            engagement_growth_rate = (engagement_growth / initial_engagement) * 100 if initial_engagement > 0 else 0
+        else:
+            engagement_growth = 0
+            engagement_growth_rate = 0
         
         analysis['增长分析'] = {
             '粉丝增长数': followers_growth,
@@ -247,43 +281,80 @@ class SocialMediaData:
         
         # 相关性分析
         if platform == "微博":
-            analysis['相关性分析'] = {
-                '转发量与互动量相关性': round(df['转发量'].corr(df['互动量']), 2),
-                '评论量与互动量相关性': round(df['评论量'].corr(df['互动量']), 2),
-                '点赞量与互动量相关性': round(df['点赞量'].corr(df['互动量']), 2)
-            }
+            analysis['相关性分析'] = {}
+            if '转发量' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['转发量与互动量相关性'] = round(df['转发量'].corr(df['engagement']), 2)
+            if '评论量' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['评论量与互动量相关性'] = round(df['评论量'].corr(df['engagement']), 2)
+            if '点赞量' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['点赞量与互动量相关性'] = round(df['点赞量'].corr(df['engagement']), 2)
         elif platform == "微信":
-            analysis['相关性分析'] = {
-                '阅读量与互动量相关性': round(df['阅读量'].corr(df['互动量']), 2),
-                '在看量与互动量相关性': round(df['在看量'].corr(df['互动量']), 2),
-                '分享量与互动量相关性': round(df['分享量'].corr(df['互动量']), 2)
-            }
+            analysis['相关性分析'] = {}
+            if '阅读量' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['阅读量与互动量相关性'] = round(df['阅读量'].corr(df['engagement']), 2)
+            if '在看量' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['在看量与互动量相关性'] = round(df['在看量'].corr(df['engagement']), 2)
+            if '分享量' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['分享量与互动量相关性'] = round(df['分享量'].corr(df['engagement']), 2)
         elif platform == "抖音":
-            analysis['相关性分析'] = {
-                '播放量与互动量相关性': round(df['播放量'].corr(df['互动量']), 2),
-                '完播率与互动量相关性': round(df['完播率'].corr(df['互动量']), 2),
-                '平均播放时长与互动量相关性': round(df['平均播放时长'].corr(df['互动量']), 2)
-            }
+            analysis['相关性分析'] = {}
+            if '播放量' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['播放量与互动量相关性'] = round(df['播放量'].corr(df['engagement']), 2)
+            if '完播率' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['完播率与互动量相关性'] = round(df['完播率'].corr(df['engagement']), 2)
+            if '平均播放时长' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['平均播放时长与互动量相关性'] = round(df['平均播放时长'].corr(df['engagement']), 2)
         elif platform == "小红书":
-            analysis['相关性分析'] = {
-                '收藏量与互动量相关性': round(df['收藏量'].corr(df['互动量']), 2),
-                '关注量与互动量相关性': round(df['关注量'].corr(df['互动量']), 2),
-                '搜索量与互动量相关性': round(df['搜索量'].corr(df['互动量']), 2)
-            }
+            analysis['相关性分析'] = {}
+            if '收藏量' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['收藏量与互动量相关性'] = round(df['收藏量'].corr(df['engagement']), 2)
+            if '关注量' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['关注量与互动量相关性'] = round(df['关注量'].corr(df['engagement']), 2)
+            if '搜索量' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['搜索量与互动量相关性'] = round(df['搜索量'].corr(df['engagement']), 2)
         elif platform == "B站":
-            analysis['相关性分析'] = {
-                '播放量与互动量相关性': round(df['播放量'].corr(df['互动量']), 2),
-                '弹幕量与互动量相关性': round(df['弹幕量'].corr(df['互动量']), 2),
-                '投币量与互动量相关性': round(df['投币量'].corr(df['互动量']), 2)
-            }
+            analysis['相关性分析'] = {}
+            if '播放量' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['播放量与互动量相关性'] = round(df['播放量'].corr(df['engagement']), 2)
+            if '弹幕量' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['弹幕量与互动量相关性'] = round(df['弹幕量'].corr(df['engagement']), 2)
+            if '投币量' in df.columns and 'engagement' in df.columns:
+                analysis['相关性分析']['投币量与互动量相关性'] = round(df['投币量'].corr(df['engagement']), 2)
+        else:
+            analysis['相关性分析'] = {}
         
         # 趋势分析
-        weekly_followers = df['粉丝数'].resample('W-MON', on='日期').mean().reset_index().sort_values('日期')
-        weekly_engagement = df['互动量'].resample('W-MON', on='日期').mean().reset_index().sort_values('日期')
+        if 'followers' in df.columns and 'date' in df.columns:
+            # 确保date列是datetime类型并设置为索引
+            df_temp = df.copy()
+            df_temp['date'] = pd.to_datetime(df_temp['date'], errors='coerce')
+            df_temp = df_temp.dropna(subset=['date'])
+            if not df_temp.empty:
+                df_temp = df_temp.set_index('date')
+                weekly_followers = df_temp['followers'].resample('W-MON').mean().reset_index()
+                followers_trend = weekly_followers.to_dict('records')
+            else:
+                followers_trend = []
+        else:
+            followers_trend = []
+            
+        if 'engagement' in df.columns and 'date' in df.columns:
+            # 确保date列是datetime类型并设置为索引
+            df_temp = df.copy()
+            df_temp['date'] = pd.to_datetime(df_temp['date'], errors='coerce')
+            df_temp = df_temp.dropna(subset=['date'])
+            if not df_temp.empty:
+                df_temp = df_temp.set_index('date')
+                weekly_engagement = df_temp['engagement'].resample('W-MON').mean().reset_index()
+                engagement_trend = weekly_engagement.to_dict('records')
+            else:
+                engagement_trend = []
+        else:
+            engagement_trend = []
         
         analysis['趋势分析'] = {
-            '粉丝数每周趋势': weekly_followers.to_dict('records'),
-            '互动量每周趋势': weekly_engagement.to_dict('records')
+            '粉丝数每周趋势': followers_trend,
+            '互动量每周趋势': engagement_trend
         }
         
         return analysis

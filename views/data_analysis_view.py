@@ -5,7 +5,6 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QScrollArea, QFrame)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon
-from PyQt6.QtWebEngineWidgets import QWebEngineView
 import pandas as pd
 import json
 import sys

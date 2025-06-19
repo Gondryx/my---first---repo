@@ -178,7 +178,7 @@ class DatabaseManager:
                   (plan_id,))
         plan = c.fetchone()
         conn.close()
-        return plan
+        return plan    
         
     def add_data_import(self, user_id, import_name, file_path, data_count, platform):
         """添加数据导入记录"""
@@ -205,4 +205,62 @@ class DatabaseManager:
         """, (user_id,))
         imports = c.fetchall()
         conn.close()
-        return imports    
+        return imports
+        
+    def get_latest_marketing_plan(self, user_id):
+        """获取用户最新的营销方案"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT plan_name, plan_data, created_at 
+                FROM marketing_plans 
+                WHERE user_id = ? 
+                ORDER BY created_at DESC 
+                LIMIT 1
+            """, (user_id,))
+            return cursor.fetchone()
+        except Exception as e:
+            print(f"获取最新营销方案失败: {e}")
+            return None
+        
+    def save_user_settings(self, user_id, **settings):
+        """保存用户设置"""
+        try:
+            cursor = self.conn.cursor()
+            
+            # 检查是否已有设置记录
+            cursor.execute("SELECT id FROM user_settings WHERE user_id = ?", (user_id,))
+            existing = cursor.fetchone()
+            
+            if existing:
+                # 更新现有设置
+                set_clause = ", ".join([f"{key} = ?" for key in settings.keys()])
+                values = list(settings.values()) + [user_id]
+                cursor.execute(f"UPDATE user_settings SET {set_clause} WHERE user_id = ?", values)
+            else:
+                # 创建新设置记录
+                columns = ["user_id"] + list(settings.keys())
+                placeholders = ["?"] * len(columns)
+                values = [user_id] + list(settings.values())
+                
+                cursor.execute(f"""
+                    INSERT INTO user_settings ({', '.join(columns)}) 
+                    VALUES ({', '.join(placeholders)})
+                """, values)
+            
+            self.conn.commit()
+            return True
+            
+        except Exception as e:
+            print(f"保存用户设置失败: {e}")
+            return False
+    
+    def get_user_settings(self, user_id):
+        """获取用户设置"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM user_settings WHERE user_id = ?", (user_id,))
+            return cursor.fetchone()
+        except Exception as e:
+            print(f"获取用户设置失败: {e}")
+            return None    

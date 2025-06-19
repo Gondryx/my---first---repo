@@ -3,9 +3,9 @@ from PyQt6.QtWidgets import (QMainWindow, QTabWidget, QWidget, QVBoxLayout,
                              QTableWidgetItem, QMessageBox, QFrame, QSplitter,
                              QComboBox, QDateEdit, QTextEdit, QLineEdit, QFileDialog,
                              QProgressBar, QGroupBox, QListWidget, QHeaderView,
-                             QStackedWidget, QInputDialog, QMenu, QToolBar)
+                             QStackedWidget, QInputDialog, QMenu, QToolBar, QScrollArea)
 from PyQt6.QtGui import QAction
-from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtCore import Qt, QDate, pyqtSignal
 from PyQt6.QtGui import QFont, QIcon, QAction
 import matplotlib.pyplot as plt
 import matplotlib
@@ -13,8 +13,36 @@ matplotlib.use('qtagg')
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 import numpy as np
 import json
+import datetime
 
 class MainView(QMainWindow):
+    logout_signal = pyqtSignal()
+    import_data_signal = pyqtSignal()
+    analyze_data_signal = pyqtSignal()
+    generate_plan_signal = pyqtSignal()
+    predict_trends_signal = pyqtSignal()
+    optimize_content_signal = pyqtSignal()
+    export_report_signal = pyqtSignal()
+    export_data_signal = pyqtSignal()
+    test_api_signal = pyqtSignal()
+    save_settings_signal = pyqtSignal()
+    change_password_signal = pyqtSignal()
+    refresh_data_signal = pyqtSignal()
+    exit_signal = pyqtSignal()
+    help_signal = pyqtSignal()
+    about_signal = pyqtSignal()
+    create_plan_signal = pyqtSignal()
+    delete_plan_signal = pyqtSignal()
+    export_plan_signal = pyqtSignal()
+    share_plan_signal = pyqtSignal()
+    
+    # 新增界面的信号
+    show_marketing_strategy_signal = pyqtSignal()
+    show_trend_prediction_signal = pyqtSignal()
+    show_content_optimization_signal = pyqtSignal()
+    show_report_management_signal = pyqtSignal()
+    show_system_settings_signal = pyqtSignal()
+    
     def __init__(self, controller):
         super().__init__()
         self.controller = controller
@@ -23,11 +51,8 @@ class MainView(QMainWindow):
         
     def initUI(self):
         # 设置窗口标题
-        self.setWindowTitle(f'社交媒体营销分析系统 - 欢迎 {self.current_user[1]}')
+        self.setWindowTitle(f'MediaSage - 欢迎：{self.current_user[1]}')
         self.setMinimumSize(1000, 600)
-        
-        # 创建菜单栏
-        self.create_menu_bar()
         
         # 创建工具栏
         self.create_tool_bar()
@@ -45,102 +70,42 @@ class MainView(QMainWindow):
         self.tabs.setTabPosition(QTabWidget.TabPosition.North)
         self.tabs.setStyleSheet("QTabBar::tab { height: 30px; }")
         
-        # 添加各个标签页
+        # 添加各个标签页（只保留一个系统设置Tab）
         self.create_dashboard_tab()
         self.create_analysis_tab()
         self.create_marketing_tab()
         self.create_trends_tab()
         self.create_content_tab()
         self.create_reports_tab()
-        self.create_settings_tab()
+        # 只保留一次系统设置Tab
+        if not hasattr(self, '_settings_tab_added'):
+            self.create_settings_tab()
+            self._settings_tab_added = True
         
         main_layout.addWidget(self.tabs)
         
-    def create_menu_bar(self):
-        """创建菜单栏"""
-        menubar = self.menuBar()
-        
-        # 文件菜单
-        file_menu = menubar.addMenu('文件')
-        
-        # 导出数据动作
-        export_action = QAction('导出数据', self)
-        export_action.triggered.connect(self.controller.export_data)
-        file_menu.addAction(export_action)
-        
-        # 导入数据动作
-        import_action = QAction('导入数据', self)
-        import_action.triggered.connect(self.controller.import_data)
-        file_menu.addAction(import_action)
-        
-        file_menu.addSeparator()
-        
-        # 退出动作
-        exit_action = QAction('退出', self)
-        exit_action.triggered.connect(self.controller.exit_application)
-        file_menu.addAction(exit_action)
-        
-        # 分析菜单
-        analysis_menu = menubar.addMenu('分析')
-        
-        # 新建分析动作
-        new_analysis_action = QAction('新建分析', self)
-        new_analysis_action.triggered.connect(lambda: self.tabs.setCurrentIndex(1))
-        analysis_menu.addAction(new_analysis_action)
-        
-        # 生成营销方案动作
-        generate_plan_action = QAction('生成营销方案', self)
-        generate_plan_action.triggered.connect(self.controller.generate_marketing_plan)
-        analysis_menu.addAction(generate_plan_action)
-        
-        # 查看趋势动作
-        trends_action = QAction('查看趋势', self)
-        trends_action.triggered.connect(lambda: self.tabs.setCurrentIndex(3))
-        analysis_menu.addAction(trends_action)
-        
-        # 帮助菜单
-        help_menu = menubar.addMenu('帮助')
-        
-        # 使用说明动作
-        help_action = QAction('使用说明', self)
-        help_action.triggered.connect(self.controller.show_help)
-        help_menu.addAction(help_action)
-        
-        # 关于动作
-        about_action = QAction('关于', self)
-        about_action.triggered.connect(self.controller.show_about)
-        help_menu.addAction(about_action)
-        
     def create_tool_bar(self):
-        """创建工具栏"""
+        """创建精简工具栏（去除设置按钮，增加关于）"""
         toolbar = QToolBar("工具栏")
         self.addToolBar(toolbar)
-        
+
         # 刷新按钮
         refresh_action = QAction("刷新", self)
-        refresh_action.triggered.connect(self.controller.refresh_data)
+        refresh_action.triggered.connect(lambda: self.refresh_data_signal.emit())
         toolbar.addAction(refresh_action)
-        
+
         # 分隔符
         toolbar.addSeparator()
-        
-        # 分析按钮
-        analysis_action = QAction("数据分析", self)
-        analysis_action.triggered.connect(lambda: self.tabs.setCurrentIndex(1))
-        toolbar.addAction(analysis_action)
-        
-        # 营销方案按钮
-        plan_action = QAction("营销方案", self)
-        plan_action.triggered.connect(lambda: self.tabs.setCurrentIndex(2))
-        toolbar.addAction(plan_action)
-        
-        # 分隔符
-        toolbar.addSeparator()
-        
-        # 设置按钮
-        settings_action = QAction("设置", self)
-        settings_action.triggered.connect(lambda: self.tabs.setCurrentIndex(6))
-        toolbar.addAction(settings_action)
+
+        # 帮助按钮
+        help_action = QAction("帮助", self)
+        help_action.triggered.connect(self.show_help_dialog)
+        toolbar.addAction(help_action)
+
+        # 关于按钮
+        about_action = QAction("关于", self)
+        about_action.triggered.connect(self.show_about_dialog)
+        toolbar.addAction(about_action)
         
     def create_dashboard_tab(self):
         """创建仪表盘标签页"""
@@ -161,16 +126,16 @@ class MainView(QMainWindow):
         dashboard_layout.addWidget(line)
         
         # 创建统计卡片布局
-        stats_layout = QHBoxLayout()
-        stats_layout.setSpacing(20)
+        self.stats_layout = QHBoxLayout()
+        self.stats_layout.setSpacing(20)
         
         # 创建统计卡片
-        self.create_stat_card("总分析任务", "0", stats_layout, "#1E88E5")
-        self.create_stat_card("已完成分析", "0", stats_layout, "#43A047")
-        self.create_stat_card("营销方案", "0", stats_layout, "#FB8C00")
-        self.create_stat_card("活跃平台", "0", stats_layout, "#E53935")
+        self.create_stat_card("总分析任务", "0", self.stats_layout, "#1E88E5")
+        self.create_stat_card("已完成分析", "0", self.stats_layout, "#43A047")
+        self.create_stat_card("营销方案", "0", self.stats_layout, "#FB8C00")
+        self.create_stat_card("活跃平台", "0", self.stats_layout, "#E53935")
         
-        dashboard_layout.addLayout(stats_layout)
+        dashboard_layout.addLayout(self.stats_layout)
         
         # 创建图表布局
         charts_layout = QHBoxLayout()
@@ -314,8 +279,21 @@ class MainView(QMainWindow):
         
         self.charts_tab = QWidget()
         self.charts_layout = QVBoxLayout(self.charts_tab)
-        self.charts_widget = QWidget()
-        self.charts_layout.addWidget(self.charts_widget)
+        
+        # 创建图表显示区域
+        self.chart_scroll_area = QScrollArea()
+        self.chart_widget = QWidget()
+        self.chart_layout = QVBoxLayout(self.chart_widget)
+        self.chart_scroll_area.setWidget(self.chart_widget)
+        self.chart_scroll_area.setWidgetResizable(True)
+        
+        # 添加图表说明
+        chart_info_label = QLabel("图表分析区域 - 分析完成后将显示可视化图表")
+        chart_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        chart_info_label.setStyleSheet("color: #7f8c8d; font-style: italic; padding: 20px;")
+        self.chart_layout.addWidget(chart_info_label)
+        
+        self.charts_layout.addWidget(self.chart_scroll_area)
         self.result_tabs.addTab(self.charts_tab, "图表分析")
         
         self.details_tab = QWidget()
@@ -370,11 +348,11 @@ class MainView(QMainWindow):
         buttons_layout = QHBoxLayout()
         
         self.new_plan_button = QPushButton("新建方案")
-        self.new_plan_button.clicked.connect(self.controller.create_new_plan)
+        self.new_plan_button.clicked.connect(lambda: self.create_plan_signal.emit())
         buttons_layout.addWidget(self.new_plan_button)
         
         self.delete_plan_button = QPushButton("删除方案")
-        self.delete_plan_button.clicked.connect(self.controller.delete_marketing_plan)
+        self.delete_plan_button.clicked.connect(lambda: self.delete_plan_signal.emit())
         buttons_layout.addWidget(self.delete_plan_button)
         
         plans_layout.addLayout(buttons_layout)
@@ -407,11 +385,11 @@ class MainView(QMainWindow):
         action_buttons_layout = QHBoxLayout()
         
         self.export_plan_button = QPushButton("导出方案")
-        self.export_plan_button.clicked.connect(self.controller.export_marketing_plan)
+        self.export_plan_button.clicked.connect(lambda: self.export_plan_signal.emit())
         action_buttons_layout.addWidget(self.export_plan_button)
         
         self.share_plan_button = QPushButton("分享方案")
-        self.share_plan_button.clicked.connect(self.controller.share_marketing_plan)
+        self.share_plan_button.clicked.connect(lambda: self.share_plan_signal.emit())
         action_buttons_layout.addWidget(self.share_plan_button)
         
         plan_content_layout.addLayout(action_buttons_layout)
@@ -698,7 +676,9 @@ class MainView(QMainWindow):
         self.tabs.addTab(reports_tab, "报告导出")
         
     def create_settings_tab(self):
-        """创建设置标签页"""
+        """创建设置标签页（防止重复添加）"""
+        if hasattr(self, '_settings_tab_added') and self._settings_tab_added:
+            return
         settings_tab = QWidget()
         settings_layout = QVBoxLayout(settings_tab)
         
@@ -772,8 +752,8 @@ class MainView(QMainWindow):
         
         # 修改密码按钮
         change_password_button = QPushButton("修改密码")
-        change_password_button.setMinimumHeight(40)
-        change_password_button.clicked.connect(self.controller.change_password)
+        change_password_button.clicked.connect(lambda: self.change_password_signal.emit())
+        settings_layout.addWidget(change_password_button)
         
         # 添加所有用户设置到布局
         user_layout.addLayout(username_layout)
@@ -784,11 +764,11 @@ class MainView(QMainWindow):
         
         # 创建保存设置按钮
         save_settings_button = QPushButton("保存设置")
-        save_settings_button.setMinimumHeight(40)
-        save_settings_button.clicked.connect(self.controller.save_settings)
+        save_settings_button.clicked.connect(lambda: self.save_settings_signal.emit())
         settings_layout.addWidget(save_settings_button)
         
         self.tabs.addTab(settings_tab, "系统设置")
+        self._settings_tab_added = True
         
     def create_stat_card(self, title, value, layout, color):
         """创建统计卡片"""
@@ -840,3 +820,33 @@ class MainView(QMainWindow):
         """加载营销方案"""
         plan_id = item.data(Qt.ItemDataRole.UserRole)
         self.controller.load_marketing_plan(plan_id)
+
+    def show_help_dialog(self):
+        """显示帮助弹窗（标题为'帮助'）"""
+        help_text = (
+            "本系统为社交媒体营销分析平台，集成AI分析、内容优化、趋势预测等功能。\n"
+            "\n"
+            "主要功能：\n"
+            "- 数据导入与分析\n"
+            "- 营销方案管理\n"
+            "- 趋势预测与内容优化\n"
+            "- 报告导出\n"
+            "- 系统个性化设置\n"
+            "\n"
+            "如需详细操作说明，请查阅用户手册或联系开发者。"
+        )
+        QMessageBox.information(self, '帮助', help_text)
+
+    def show_about_dialog(self):
+        """显示关于弹窗，含开发者信息，年份自动更新"""
+        current_year = datetime.datetime.now().year
+        about_text = (
+            "社交媒体营销分析系统\n"
+            "版本：v1.0.0\n"
+            "开发者：Gondryisme\n"
+            "\n"
+            "本系统基于Python 3.9 + PyQt6开发，集成AI分析能力。\n"
+            "\n"
+            f"© {current_year} Gondryisme 保留所有权利。"
+        )
+        QMessageBox.information(self, '关于', about_text)

@@ -10,22 +10,17 @@ class RegisterView(QWidget):
         self.initUI()
         
     def initUI(self):
-        # 设置窗口标题
-        self.setWindowTitle('社交媒体营销分析系统 - 注册')
-        
+        self.setWindowTitle('MediaSage')
         # 创建主布局
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(30, 30, 30, 30)
         main_layout.setSpacing(20)
-        
-        # 创建标题
-        title_label = QLabel('社交媒体营销分析系统 - 注册')
+        # 恢复顶部大标题和分隔线
+        title_label = QLabel('注册')
         title_font = QFont('Arial', 20, QFont.Weight.Bold)
         title_label.setFont(title_font)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(title_label)
-        
-        # 添加分隔线
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         line.setFrameShadow(QFrame.Shadow.Sunken)

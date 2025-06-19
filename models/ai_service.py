@@ -199,7 +199,7 @@ class AIService:
                 self.base_url,
                 headers=self.headers,
                 json=data,
-                timeout=30
+                timeout=10
             )
             
             if response.status_code == 200:

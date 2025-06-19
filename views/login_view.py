@@ -1,31 +1,27 @@
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QLineEdit, 
                              QPushButton, QHBoxLayout, QMessageBox, QFrame)
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 
 class LoginView(QWidget):
     def __init__(self, controller):
         super().__init__()
         self.controller = controller
+        self._login_success = False
         self.initUI()
         
     def initUI(self):
-        # 设置窗口标题
-        self.setWindowTitle('社交媒体营销分析系统 - 登录')
-        
+        self.setWindowTitle('MediaSage')
         # 创建主布局
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(30, 30, 30, 30)
         main_layout.setSpacing(20)
-        
-        # 创建标题
-        title_label = QLabel('社交媒体营销分析系统')
+        # 恢复顶部大标题和分隔线
+        title_label = QLabel('登录')
         title_font = QFont('Arial', 24, QFont.Weight.Bold)
         title_label.setFont(title_font)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(title_label)
-        
-        # 添加分隔线
         line = QFrame()
         line.setFrameShape(QFrame.Shape.HLine)
         line.setFrameShadow(QFrame.Shadow.Sunken)
@@ -85,20 +81,23 @@ class LoginView(QWidget):
         """处理登录按钮点击事件"""
         username = self.username_input.text()
         password = self.password_input.text()
-        
         if not username or not password:
             QMessageBox.warning(self, '登录失败', '用户名和密码不能为空')
             return
-            
         # 调用控制器的登录方法
         success, message = self.controller.login(username, password)
-        
         if success:
             QMessageBox.information(self, '登录成功', '欢迎回来！')
-            self.controller.show_main_view()
+            self._login_success = True
+            self.close()
         else:
             QMessageBox.warning(self, '登录失败', message)
             
     def handle_register(self):
         """处理注册按钮点击事件"""
         self.controller.show_register_view()    
+
+    def closeEvent(self, event):
+        super().closeEvent(event)
+        if getattr(self, '_login_success', False):
+            self.controller.show_main_view()

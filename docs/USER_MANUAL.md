@@ -1,8 +1,8 @@
-# 📖 人工智能社交媒体营销分析系统 - 用户操作手册
+# 📖 MediaSage 用户操作手册
 
 ## 🎯 系统概述
 
-人工智能社交媒体营销分析系统是一个基于PyQt6开发的桌面应用程序，集成了DeepSeek AI技术，专门用于分析社交媒体数据并生成精准的营销策略。
+MediaSage 是一个基于PyQt6开发的桌面应用程序，集成了DeepSeek AI技术，专门用于分析社交媒体数据并生成精准的营销策略。
 
 ### ✨ 主要功能
 - 🔐 **用户管理**: 安全的登录注册系统
@@ -687,3 +687,52 @@ python run.py
 ---
 
 **注意**: 本操作手册会随着系统更新而更新，请关注最新版本。 
+
+## 打包流程
+
+### 安装 PyInstaller
+
+在你的虚拟环境中执行：
+```bash
+pip install pyinstaller
+```
+
+### 打包命令
+
+假设你的主入口是 `main.py`，在项目根目录下运行：
+```bash
+pyinstaller -F -w --add-data "assets;assets" --add-data "config.py;." main.py
+```
+- `-F`：打包成单一exe文件
+- `-w`：不显示命令行窗口（适合GUI应用）
+- `-i`：指定应用图标（可选，需有ico文件）
+
+### 常见注意事项
+
+1. **资源文件**  
+   如果程序依赖图片、csv、配置等外部文件，需在 `pyinstaller` 命令中用 `--add-data` 参数指定。例如：
+   ```bash
+   pyinstaller -F -w --add-data "assets;assets" main.py
+   ```
+   语法：`--add-data "源路径;目标路径"`
+
+2. **PyQt6兼容性**  
+   打包后首次运行可能会慢，部分PyQt6依赖的DLL会被自动包含。
+
+3. **测试可执行文件**  
+   打包完成后，在 `dist/` 目录下会生成 `main.exe`，双击测试是否能正常运行。
+
+4. **常见问题**  
+   - 若启动报错缺少DLL，可尝试升级PyInstaller或手动复制缺失的DLL到exe同目录。
+   - 若界面乱码，确保字体文件和编码设置正确。
+
+### 示例完整命令
+
+```bash
+pyinstaller -F -w --add-data "assets;assets" --add-data "config.py;." main.py
+```
+如有多个资源目录/文件，可多次使用 `--add-data`。
+
+如需生成安装包（如msi、安装向导），可用 Inno Setup、NSIS 等工具进一步封装。
+
+如需我帮你生成具体的打包命令或配置 `.spec` 文件，请告知你的主入口文件名和资源目录结构！ 
